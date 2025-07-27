@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Match the Column - Infinity Maths</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body.dark {
+  background: #121212;
+  color: #eee;
+}
+body.dark .column {
+  background: #1e1e1e;
+  box-shadow: 0 0 10px #000;
+}
+body.dark .item {
+  background: #263238;
+  color: #fff;
+}
+body.dark .item:hover {
+  background: #37474f;
+}
+body.dark .dropzone {
+  background: #333;
+  color: #fff;
+  border-color: #555;
+}
+body.dark select, body.dark button {
+  background: #222;
+  color: #eee;
+  border-color: #777;
+}
+body.dark .dropzone.correct {
+  background: #33691e;
+}
+body.dark .dropzone.incorrect {
+  background: #b71c1c;
+}
+#darkModeBtn {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #03a9f4;
+  color: white;
+  border: none;
+  font-size: 0.9em;
+}
+
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f4f8;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+    h1 {
+      color: #333;
+      font-size: 1.8em;
+    }
+    .top-controls {
+      margin: 10px 0;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+    }
+    select, button {
+      font-size: 1em;
+      padding: 10px;
+      border-radius: 8px;
+      border: 2px solid #03a9f4;
+      background: white;
+      color: #333;
+    }
+    button {
+      background: #03a9f4;
+      color: white;
+    }
+    .columns {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 20px;
+      gap: 15px;
+    }
+    .column {
+      flex: 1 1 300px;
+      max-width: 500px;
+      background: white;
+      border-radius: 10px;
+      padding: 15px;
+      box-shadow: 0 0 10px #ccc;
+    }
+    .item {
+      background: #e0f7fa;
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 5px;
+      cursor: grab;
+      font-weight: bold;
+      transition: background 0.3s;
+    }
+    .item:hover {
+      background: #b2ebf2;
+    }
+    .dropzone {
+      border: 2px dashed #bbb;
+      min-height: 40px;
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 5px;
+      background: #fffde7;
+    }
+    .dropzone.correct {
+      border-color: green;
+      background: #dcedc8;
+    }
+    .dropzone.incorrect {
+      border-color: red;
+      background: #ffcdd2;
+    }
+    .stats {
+      margin-top: 10px;
+      font-size: 1em;
+      color: #444;
+    }
+    @media (max-width: 600px) {
+      h1 {
+        font-size: 1.4em;
+      }
+      .top-controls {
+        flex-direction: column;
+        gap: 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🧠 Match the Column - Infinity Maths</h1>
+
+  <div class="top-controls">
+    <select id="level" onchange="generateMatch()">
+      <option value="easy">🟢 Easy</option>
+      <option value="medium">🟡 Medium</option>
+      <option value="hard">🔴 Hard</option>
+      <option value="genius">🧠 Genius</option>
+      <option value="extreme">🚀 Extreme</option>
+      <option value="fractions">📐 Fraction & Power</option>
+    </select>
+    <button onclick="generateMatch()">♻️ New Round</button>
+
+    <button onclick="toggleDarkMode()" id="darkModeBtn">🌙 Dark Mode</button>
+
+  </div>
+
+  <div class="stats" id="scoreStats">
+    Score: 0 | Time: 0s | ⏱ Best Time: -- | 🏆 High Score: --
+  </div>
+
+  <div class="columns">
+    <div class="column" id="questions">
+      <h3>Questions</h3>
+    </div>
+    <div class="column" id="answers">
+      <h3>Answers</h3>
+    </div>
+  </div>
+
+  <audio id="sound-correct" src="https://cdn.jsdelivr.net/gh/hemangjoshi37/assets/sounds/correct.mp3"></audio>
+  <audio id="sound-wrong" src="https://cdn.jsdelivr.net/gh/hemangjoshi37/assets/sounds/wrong.mp3"></audio>
+
+  <script>
+    let correctAnswers = {};
+    let score = 0;
+    let startTime, timerInterval;
+    let totalQuestions = 5;
+
+    function getLevelSettings(level) {
+      switch (level) {
+        case "easy": return { type: "basic", ops: ['+', '-'], range: 20 };
+        case "medium": return { type: "basic", ops: ['+', '-', '*'], range: 50 };
+        case "hard": return { type: "basic", ops: ['+', '-', '*', '/'], range: 100 };
+        case "genius": return { type: "basic", ops: ['+', '-', '*', '/', '^'], range: 200 };
+        case "extreme": return { type: "basic", ops: ['+', '-', '*', '/', '^'], range: 999 };
+        case "fractions": return { type: "fractions" };
+      }
+    }
+
+    function getRandomFraction() {
+      let num = Math.floor(Math.random() * 9) + 1;
+      let den = Math.floor(Math.random() * 9) + 1;
+      return `${num}/${den}`;
+    }
+
+    function evaluateFraction(expr) {
+      let [a, op, b] = expr.split(' ');
+      let [an, ad] = a.split('/').map(Number);
+      let [bn, bd] = b.split('/').map(Number);
+      let result;
+
+      if (op === '+') result = (an * bd + bn * ad) / (ad * bd);
+      if (op === '-') result = (an * bd - bn * ad) / (ad * bd);
+      if (op === '*') result = (an * bn) / (ad * bd);
+      if (op === '/') result = (an * bd) / (ad * bn);
+
+      return parseFloat(result.toFixed(2));
+    }
+
+    function generateMatch() {
+      clearInterval(timerInterval);
+      score = 0;
+      updateStats();
+
+      const level = document.getElementById("level").value;
+      const questionsDiv = document.getElementById('questions');
+      const answersDiv = document.getElementById('answers');
+      questionsDiv.innerHTML = "<h3>Questions</h3>";
+      answersDiv.innerHTML = "<h3>Answers</h3>";
+
+      correctAnswers = {};
+      const questions = [];
+      const answers = [];
+
+      const { type, ops, range } = getLevelSettings(level);
+
+      for (let i = 0; i < totalQuestions; i++) {
+        let expr, result;
+
+        if (type === "fractions") {
+          if (Math.random() < 0.5) {
+            let f1 = getRandomFraction();
+            let f2 = getRandomFraction();
+            let op = ['+', '-', '*', '/'][Math.floor(Math.random() * 4)];
+            expr = `${f1} ${op} ${f2}`;
+            result = evaluateFraction(expr);
+          } else {
+            let base = Math.floor(Math.random() * 9 + 2);
+            let exp = Math.floor(Math.random() * 3 + 2);
+            expr = `${base}^${exp}`;
+            result = Math.pow(base, exp);
+          }
+        } else {
+          let a = Math.floor(Math.random() * range + 1);
+          let b = Math.floor(Math.random() * range + 1);
+          let op = ops[Math.floor(Math.random() * ops.length)];
+          if (op === '/' && b === 0) b = 1;
+          if (op === '^') b = Math.floor(Math.random() * 3 + 2);
+          expr = `${a} ${op} ${b}`;
+          result = eval(op === '^' ? `Math.pow(${a},${b})` : expr);
+          result = op === '/' ? parseFloat(result.toFixed(2)) : result;
+        }
+
+        questions.push({ id: `q${i}`, text: expr, answer: result });
+        answers.push({ id: `a${i}`, text: result });
+        correctAnswers[`q${i}`] = result;
+      }
+
+      answers.sort(() => 0.5 - Math.random());
+
+      questions.forEach(q => {
+        let div = document.createElement("div");
+        div.className = "item dropzone";
+        div.id = q.id;
+        div.innerHTML = `${q.text} = <span>Drop answer here</span>`;
+        div.dataset.answer = q.answer;
+        div.ondragover = e => e.preventDefault();
+        div.ondrop = drop;
+        questionsDiv.appendChild(div);
+      });
+
+      answers.forEach(a => {
+        let div = document.createElement("div");
+        div.className = "item";
+        div.draggable = true;
+        div.id = a.id;
+        div.innerText = a.text;
+        div.ondragstart = e => e.dataTransfer.setData("text", e.target.id);
+        answersDiv.appendChild(div);
+      });
+
+      startTime = Date.now();
+      timerInterval = setInterval(updateStats, 1000);
+    }
+
+    function updateStats() {
+      let timeTaken = Math.floor((Date.now() - startTime) / 1000);
+      const level = document.getElementById("level").value;
+      let bestTime = localStorage.getItem(`bestTime_${level}`) || "--";
+      let bestScore = localStorage.getItem(`bestScore_${level}`) || "--";
+      document.getElementById("scoreStats").innerText = `Score: ${score} | Time: ${timeTaken}s | ⏱ Best Time: ${bestTime} | 🏆 High Score: ${bestScore}`;
+    }
+
+    function drop(ev) {
+      ev.preventDefault();
+      const draggedId = ev.dataTransfer.getData("text");
+      const dragged = document.getElementById(draggedId);
+      const dropzone = ev.target.closest(".dropzone");
+      if (!dropzone || !dragged) return;
+
+      const correct = dropzone.dataset.answer == dragged.innerText;
+      const sound = document.getElementById(correct ? "sound-correct" : "sound-wrong");
+      sound.play();
+
+      dropzone.classList.remove("correct", "incorrect");
+      dropzone.classList.add(correct ? "correct" : "incorrect");
+      dropzone.querySelector("span").innerText = dragged.innerText;
+
+      dragged.draggable = false;
+      dragged.style.opacity = 0.5;
+
+      if (correct) {
+        score++;
+        updateStats();
+        if (score === totalQuestions) endGame();
+      }
+    }
+
+    function endGame() {
+      clearInterval(timerInterval);
+      const level = document.getElementById("level").value;
+      const timeTaken = Math.floor((Date.now() - startTime) / 1000);
+      const bestTimeKey = `bestTime_${level}`;
+      const bestScoreKey = `bestScore_${level}`;
+
+      let prevBestTime = localStorage.getItem(bestTimeKey);
+      if (!prevBestTime || timeTaken < parseInt(prevBestTime)) {
+        localStorage.setItem(bestTimeKey, timeTaken);
+      }
+
+      let prevBestScore = localStorage.getItem(bestScoreKey);
+      if (!prevBestScore || score > parseInt(prevBestScore)) {
+        localStorage.setItem(bestScoreKey, score);
+      }
+
+      updateStats();
+      alert("🎉 All matched! Great job!");
+    }
+
+    generateMatch(); // load on start
+    function toggleDarkMode() {
+    const body = document.body;
+    body.classList.toggle("dark");
+    const isDark = body.classList.contains("dark");
+    document.getElementById("darkModeBtn").innerText = isDark ? "🌞 Light Mode" : "🌙 Dark Mode";
+    localStorage.setItem("darkMode", isDark);
+  }
+
+  // Load saved mode
+  window.onload = () => {
+    if (localStorage.getItem("darkMode") === "true") {
+      document.body.classList.add("dark");
+      document.getElementById("darkModeBtn").innerText = "🌞 Light Mode";
+    }
+  };
+  </script>
+</body>
+</html>
